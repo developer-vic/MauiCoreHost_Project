@@ -1,16 +1,16 @@
-# Ignore everything
-*
-
-# Allow .gitignore itself
-!.gitignore
-
-# Allow the iOS delivery folder and all its contents
-!iOS_Delivery/
-!iOS_Delivery/**
-
 # Ignore build artifacts (bin and obj folders)
 **/bin/
 **/obj/
 bin/
 obj/
+
+# Ignore BiblCal-master folder
+BiblCal-master/
+BiblCal-master/**
+
+# Ignore all .txt files
+*.txt
+
+# But allow Core_Library_Gap_Analysis.txt
+!Core_Library_Gap_Analysis.txt
 
