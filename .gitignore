@@ -8,3 +8,9 @@
 !iOS_Delivery/
 !iOS_Delivery/**
 
+# Ignore build artifacts (bin and obj folders)
+**/bin/
+**/obj/
+bin/
+obj/
+
