@@ -21,6 +21,16 @@
 
             <Frame BorderColor="Gray" Padding="10">
                 <VerticalStackLayout Spacing="10">
+                    <Label Text="Navigation:" FontAttributes="Bold" />
+                    <Button
+                        Text="Local Moon Visibility"
+                        Clicked="OnNavigateToLocalMoons"
+                        HorizontalOptions="Fill" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Frame BorderColor="Gray" Padding="10">
+                <VerticalStackLayout Spacing="10">
                     <Label Text="Enter Year:" FontAttributes="Bold" />
                     <Entry x:Name="YearEntry" 
                            Placeholder="Enter year (e.g., 2024 or -4004 for BCE)"

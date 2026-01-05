@@ -28,6 +28,7 @@ This project contains a .NET MAUI application that uses a shared Core library fo
      - `SunsetCalculations` - Sunset time calculations
      - `TimesCalculations` - Sun/Moon rise/set calculations
      - `Documentation` - Help text and documentation
+     - `LocalMoonCalculations` - **NEW: Full local moon visibility calculations** (Milestone 1)
    - Removed all Windows-specific dependencies (Win32, System.Drawing, System.Media, Windows.Forms)
 
 2. **Abstraction Interfaces**
@@ -39,6 +40,38 @@ This project contains a .NET MAUI application that uses a shared Core library fo
    - Created MAUI implementations of abstraction interfaces
    - UI demonstrating Core library usage
    - Successfully builds for iOS and macOS (Mac Catalyst)
+
+4. **Milestone 1: Local Moon Visibility Feature** ✅
+   - **Complete UI Implementation**
+     - Location dropdown (Picker) with preset cities matching Windows app
+     - Manual coordinate inputs (Latitude/Longitude with degrees, minutes, N/S/E/W directions)
+     - GMT offset input field
+     - Year input field
+     - Calculate button with extracted Windows app icon
+     - Results display with formatted output matching Windows app exactly
+   - **Full Calculation Logic**
+     - Complete port of all astronomical calculations from Windows app
+     - `LocalMoonCalculations` class with full implementation:
+       - `FindFirstDay()` - New moon date calculations
+       - `FiftyTwoFifty()` - Julian Day to Gregorian conversion
+       - `FiftyFourHundred()` - Moon visibility calculation loop
+       - `PrintSunset()` - Sunset time calculations
+       - `FindPositionOfMoon()` - Moon position calculations (Formula 30)
+       - `NauticalTwilightCalc()` - Twilight calculations
+       - `FormatToString()` - Number formatting matching Windows app
+     - All calculations produce identical results to Windows app
+   - **Output Format**
+     - Exact header format: `" Date     Sunset Moonset   Illum. Sun's  [Moon's at Sunset]  Sun's    Visib   Visible?"`
+     - Exact subheader format: `"(Evening)                    %    Azimuth Azimuth Altitude   Alt(M)   Number"`
+     - Location format matches Windows app
+     - Year formatting with CE/BCE suffix
+   - **Icon Integration**
+     - Extracted `cmdLocMon` icon from Windows app's resource file
+     - Saved as `local_moon.png` in Resources/Images
+     - Integrated into Calculate button
+   - **Navigation**
+     - Accessible from MainPage via navigation button
+     - Added to AppShell routing
 
 ### Available Functionality
 
@@ -53,6 +86,7 @@ The implementation provides complete functionality:
 - **Creation date calculations** - Calculate possible Creation dates
 - **Sunset calculations** - Calculate sunset times for locations
 - **Times calculations** - Calculate sunrise/sunset, moonrise/moonset, moon illumination
+- **Local Moon Visibility** - **NEW (Milestone 1)**: Calculate visible new moons for any location with exact Windows app behavior
 - **Documentation** - Complete help text for all modules
 
 ## Building and Running
@@ -258,6 +292,12 @@ public partial class YourPage : ContentPage
 
 #### TimesCalculations
 - `CalculateTimes(year, longitude, latitude, gmtOffset, useBiblicalYear)` - Calculate sun/moon times
+
+#### LocalMoonCalculations (Milestone 1)
+- `CalculateLocalMoons(year, longitude, latitude, hr, locationName)` - Calculate local moon visibility for a location
+  - Full astronomical calculations matching Windows app exactly
+  - Outputs sunset time, moonset time, illumination %, azimuths, altitudes, visibility number
+  - Determines visibility status: "Not Visible", "Prob Not Visible", "Prob Visible", or "Visible"
 
 #### Documentation
 - `GetDocumentation(mode)` - Get help text for specific module

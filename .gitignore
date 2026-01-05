@@ -11,6 +11,3 @@ BiblCal-master/**
 # Ignore all .txt files
 *.txt
 
-# But allow Core_Library_Gap_Analysis.txt
-!Core_Library_Gap_Analysis.txt
-
