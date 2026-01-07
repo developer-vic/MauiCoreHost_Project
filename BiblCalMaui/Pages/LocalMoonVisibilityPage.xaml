@@ -18,19 +18,19 @@
               </ResourceDictionary>
        </ContentPage.Resources>
 
-       <VerticalStackLayout Padding="10"
-                            Spacing="15"
-                            BackgroundColor="#00ffff">
+       <Grid Padding="10" BackgroundColor="#00ffff">
+              <Grid.RowDefinitions>
+                     <RowDefinition Height="Auto"/>
+                     <RowDefinition Height="Auto"/>
+                     <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
 
               <!-- Year Input and Calculate Button, and Location on Same Row -->
-              <Grid RowDefinitions="auto"
-                    ColumnDefinitions="auto,auto,*"
-                    ColumnSpacing="5"
-                    RowSpacing="10">
+              <Grid Grid.Row="0" RowDefinitions="auto" ColumnDefinitions="auto,auto,*" ColumnSpacing="5" RowSpacing="10">
                      <Entry x:Name="YearEntry"
                             Grid.Row="0"
                             Grid.Column="0"
-                            Placeholder="Enter year"
+                            Placeholder="Year"
                             Keyboard="Numeric"
                             HorizontalOptions="Start"
                             VerticalOptions="Center"/>
@@ -42,7 +42,7 @@
                                   WidthRequest="40"
                                   HeightRequest="40"
                                   BackgroundColor="Transparent"/>
-                     <Grid Grid.Row="0" Grid.Column="2" RowDefinitions="Auto,Auto,Auto">
+                     <Grid Grid.Row="0" Grid.Column="2" RowDefinitions="Auto,Auto">
                             <Entry x:Name="LocationEntry"
                                    Grid.Row="0"
                                    Placeholder="Select or enter location name"
@@ -50,42 +50,50 @@
                                    TextChanged="OnLocationEntryTextChanged"
                                    Focused="OnLocationEntryFocused"
                                    Unfocused="OnLocationEntryUnfocused"/>
-                            <Border x:Name="LocationDropdown"
-                                    Grid.Row="1"
-                                    StrokeThickness="1"
-                                    Stroke="Gray"
-                                    BackgroundColor="White"
-                                    IsVisible="False"
-                                    MaximumHeightRequest="200"
-                                    Margin="0,2,0,0">
-                                   <CollectionView x:Name="LocationDropdownList"
-                                                   SelectionMode="Single"
-                                                   SelectionChanged="OnLocationDropdownItemSelected"
-                                                   BackgroundColor="White">
-                                          <CollectionView.ItemTemplate>
-                                                 <DataTemplate>
-                                                        <Grid Padding="10,5">
-                                                               <Label Text="{Binding Name}"
-                                                                      FontSize="14"
-                                                                      TextColor="Black"
-                                                                      VerticalOptions="Center"/>
-                                                        </Grid>
-                                                 </DataTemplate>
-                                          </CollectionView.ItemTemplate>
-                                   </CollectionView>
-                            </Border>
                             <Label Text="To edit, add or delete a location (Press ENTER after the location name)"
-                                   Grid.Row="2"
+                                   Grid.Row="1"
                                    FontSize="10"
                                    TextColor="Gray"
                                    Margin="5,2,0,0"/>
                      </Grid>
               </Grid>
+              
+              <!-- Overlay Dropdown - positioned absolutely to overlay other controls -->
+              <Border x:Name="LocationDropdown"
+                      Grid.Row="0"
+                      Grid.RowSpan="3"
+                      Grid.Column="2"
+                      StrokeThickness="1"
+                      Stroke="Gray"
+                      BackgroundColor="White"
+                      IsVisible="False"
+                      MaximumHeightRequest="200"
+                      ZIndex="1000"
+                      HorizontalOptions="Start"
+                      VerticalOptions="Start"
+                      Margin="120,40,0,0">
+                     <CollectionView x:Name="LocationDropdownList"
+                                     SelectionMode="Single"
+                                     SelectionChanged="OnLocationDropdownItemSelected"
+                                     BackgroundColor="White">
+                            <CollectionView.ItemTemplate>
+                                   <DataTemplate>
+                                          <Grid Padding="10,5">
+                                                 <Label Text="{Binding Name}"
+                                                        FontSize="14"
+                                                        TextColor="Black"
+                                                        VerticalOptions="Center"/>
+                                          </Grid>
+                                   </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                     </CollectionView>
+              </Border>
 
               <!-- Latitude Inputs -->
-              <Grid ColumnDefinitions="auto,auto,auto,auto,auto,auto,auto,auto,auto"
+              <Grid Grid.Row="1" ColumnDefinitions="auto,auto,auto,auto,auto,auto,auto,auto,auto"
                     ColumnSpacing="5"
-                    RowDefinitions="Auto,Auto">
+                    RowDefinitions="Auto,Auto"
+                    Margin="0,15,0,0">
                      <!-- Latitude -->
                      <Entry x:Name="LatDegEntry"
                             Placeholder="Deg"
@@ -166,10 +174,12 @@
               </Grid>
 
               <!-- Results -->
-              <Border StrokeThickness="3"
+              <Border Grid.Row="2"
+                      StrokeThickness="3"
                       Stroke="LightGray"
                       BackgroundColor="White"
-                      Padding="5">
+                      Padding="5"
+                      Margin="0,15,0,0">
                      <ScrollView HeightRequest="700"
                                  Orientation="Vertical">
                             <Label x:Name="ResultsLabel"
@@ -183,7 +193,7 @@
                      </ScrollView>
               </Border>
 
-       </VerticalStackLayout>
+       </Grid>
 
 </ContentPage>
 

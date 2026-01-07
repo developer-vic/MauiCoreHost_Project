@@ -154,6 +154,33 @@ namespace BiblCalMaui.Pages
                         LocationDropdownList.ItemsSource = _locations;
                     }
                     
+                    // Position dropdown to match entry width and align with it
+                    if (LocationEntry != null && LocationDropdown != null)
+                    {
+                        // Use a small delay to ensure layout is complete
+                        Task.Delay(50).ContinueWith(_ =>
+                        {
+                            MainThread.BeginInvokeOnMainThread(() =>
+                            {
+                                try
+                                {
+                                    if (LocationEntry != null && LocationDropdown != null)
+                                    {
+                                        // Match the entry's width
+                                        if (LocationEntry.Width > 0)
+                                        {
+                                            LocationDropdown.WidthRequest = LocationEntry.Width;
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"Error positioning dropdown: {ex.Message}");
+                                }
+                            });
+                        });
+                    }
+                    
                     // Show the dropdown
                     LocationDropdown.IsVisible = _locations.Count > 0;
                 }
