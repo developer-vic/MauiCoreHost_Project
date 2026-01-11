@@ -54,7 +54,7 @@ namespace BiblCalCore
         private double _hm = 0; // Minute of sunset
         private double _ho = 0; // Hour of moonset
         private double _hq = 0; // Minute of moonset
-        private double _il = 0; // Illumination
+        private float _il = 0; // Illumination (Windows uses float, not double)
         private double _azs = 0; // Sun's azimuth
         private double _az = 0; // Moon's azimuth
         private double _hal = 0; // Moon's altitude
@@ -65,8 +65,6 @@ namespace BiblCalCore
         private double _aa = 0; // First day of month Julian Day
         private double _dateOfFirstMonth = 0;
         private int _m0 = 0; // Month counter
-        private double _startingMonth = 0; // Track starting month for current calculation
-        private bool _processingNotVisible = false; // Track if we're processing a "Not Visible" recursive call
 
         // Additional variables for calculations
         private double _a4 = 0, _a5 = 0, _a6 = 0, _a7 = 0, _a9 = 0;
@@ -88,12 +86,13 @@ namespace BiblCalCore
         private double _im = 0, _di = 0;
         private double _ee = 0, _eo = 0;
         private double _ras = 0, _tra2 = 0, _tra4 = 0;
-        private double _azc = 0, _aza = 0, _azb = 0;
+        private double _azc = 0, _aza = 0, _azb = 0, _cazs = 0;
         private double _halp = 0, _ssam = 0;
         private double _kt = 0, _tm = 0;
         private double _mc = 0;
         private double _lt1 = 0, _b31 = 0;
         private double _aj = 0, _sj = 0, _mj = 0;
+        private double _originalGmtOffset = double.NaN; // Store original GMT offset for display
         private double _dmt = 0;
         private double _hl = 0;
 
@@ -119,7 +118,7 @@ namespace BiblCalCore
         /// <summary>
         /// Calculates new moons for local location (matching CalcNewMoons with LocalCalcFlag=true)
         /// </summary>
-        public void CalculateLocalMoons(double year, double longitude, double latitude, double hr, string locationName = "")
+        public void CalculateLocalMoons(double year, double longitude, double latitude, double hr, string locationName = "", double originalGmtOffset = double.NaN)
         {
             // Windows GetLocation: LG = Degrees(txtLongDeg) = Longitude, LT = Degrees(txtLatDeg) = Latitude
             // LG = Longitude, LT = Latitude (variable names match their meaning)
@@ -127,6 +126,8 @@ namespace BiblCalCore
             _calculator.LG = longitude;  // LG is Longitude
             _calculator.LT = latitude;   // LT is Latitude
             _calculator.HR = hr;
+            // Store original GMT offset for display in header
+            _originalGmtOffset = originalGmtOffset;
 
             // Initialize variables (matching InitializeVariables)
             InitializeCalculationVariables();
@@ -134,7 +135,6 @@ namespace BiblCalCore
             _dateOfFirstMonth = 0;
             _m0 = 0;
             _dmt = 0;
-            _startingMonth = 0; // Reset starting month tracking
 
             // Print header
             _outputWriter.WriteLine($"{FormatYear(year)} CALCULATED NEW MOONS");
@@ -243,18 +243,6 @@ namespace BiblCalCore
             double c = Math.Floor((b - 122.1) / 365.25);
             double g = Math.Floor(365.25 * c);
             double e = Math.Floor((b - g) / 30.6001);
-            double tempDaye = b - g - Math.Floor(30.6001 * e) + _jf;
-            double tempM;
-            if (e < 13.5)
-            {
-                tempM = e - 1;
-            }
-            else
-            {
-                tempM = e - 13;
-            }
-            _startingMonth = tempM; // Store starting month
-
             FiftyTwoFifty();
         }
 
@@ -293,39 +281,15 @@ namespace BiblCalCore
                 _gyear--;
             }
 
-            // Check if we've moved to a different month (for local calculations)
-            // If so, stop processing days for current month
-            // Exception: If we're processing a "Not Visible" recursive call, allow the first day of next month
-            // to be processed (this handles cases where a "Not Visible" day at month end leads to a visible day in next month)
-            if (_startingMonth > 0 && Math.Abs(_m - _startingMonth) > 0.5)
-            {
-                // Month changed
-                if (!_processingNotVisible)
-                {
-                    // Not in a recursive "Not Visible" call, stop processing days for this month
-                    return;
-                }
-                // We're in a recursive "Not Visible" call and month changed
-                // Allow processing this first day of next month, then stop
-                _processingNotVisible = false;
-                // Continue processing this day
-            }
-
-            // Print date (matching Windows - no explicit padding)
-            _dayString = _daye.ToString();
-            if (_dayString.Contains("."))
-            {
-                _dayString = _dayString.Substring(0, _dayString.IndexOf("."));
-            }
+            int dayInt = (int)Math.Floor(_daye);
+            _dayString = dayInt >= 0 ? " " + dayInt.ToString() : dayInt.ToString();
+            _dayString = _dayString.Substring(1);
             if (_dayString.Length < 2)
             {
-                _dayString = " " + _dayString;
+                _dayString = _dayString + " ";
             }
-            // Windows: TPrint(DayString + " " + MonthName[...]) - no extra spacing
             _outputWriter.Write(_dayString + " " + MonthName[(int)_m]);
 
-            // Windows uses LG directly (which is already a fraction 0-1 after InitializeVariables), not LG * 360
-            // Matching Windows: JT = (JI + LG + 0.2222 + DT - 2415020) / 36525
             if (_ji < 1483746)
             {
                 _jt = (_ji + _calculator.LG + 0.2222 + _dt - 2415020) / 36525;
@@ -340,43 +304,34 @@ namespace BiblCalCore
 
         private void FiftyFourHundred()
         {
-            // Matching Windows FiftyFourHundred (lines 639-825) but WITHOUT recursive calls for local calculations
             bool moonsetFound = false;
             PrintSunset();
             if (_dmt == 0)
             {
-                // Calculate sun's azimuth (LT is already in radians after InitializeCalculationVariables)
-                double cazs = -(Math.Sin(_ds) / Math.Cos(_calculator.LT));
-                _azs = (-Math.Atan(cazs / Math.Sqrt((-cazs) * cazs + 1)) + 1.570796326795) / DR;
+                _cazs = -(Math.Sin(_ds) / Math.Cos(_calculator.LT));
+                _azs = (-Math.Atan(_cazs / Math.Sqrt((-_cazs) * _cazs + 1)) + 1.570796326795) / DR;
                 _azsString = FormatToString(_azs, 5);
 
-                // Windows uses LG directly (which is already a fraction 0-1), not LG * 360
-                // Matching Windows: JT = (JI + HS / 24 + DT + LG - 2415020.0278) / 36525
                 if (_ji < 1483746)
                 {
-                    _jt = (_ji + _hs / 24 + _dt + _calculator.LG - 2415020.0278) / 36525;
+                    _jt = (_ji + _hs / 24.0 + _dt + _calculator.LG - 2415020.0278) / 36525.0;
                 }
                 else
                 {
-                    _jt = (_ji + _hs / 24 + _dt + _calculator.LG - 2415020) / 36525;
+                    _jt = (_ji + _hs / 24.0 + _dt + _calculator.LG - 2415020) / 36525.0;
                 }
 
-                // Loop to find moonset (with safety counter)
-                int loopCounter = 0;
-                const int maxIterations = 100;
-                bool variablesSet = false; // Track if variables were set in loop
                 do
                 {
                     FindPositionOfMoon();
                     if (_mc != 0)
                     {
                         moonsetFound = true;
-                        _hoString = ((int)_ho).ToString();
-                        _hqString = ((int)_hq).ToString();
-                        if (_hqString.Length > 1)
-                        {
-                            _hqString = _hqString.Substring(Math.Max(_hqString.Length - 2, 0));
-                        }
+                        // Windows: HOString = Conversion.Str(HO); // adds leading space for positive numbers
+                        _hoString = _ho >= 0 ? " " + _ho.ToString() : _ho.ToString();
+                        // Windows: HQString = Conversion.Str(HQ); HQString = HQString.Substring(1);
+                        _hqString = _hq >= 0 ? " " + _hq.ToString() : _hq.ToString();
+                        _hqString = _hqString.Substring(1);
                     }
                     else
                     {
@@ -390,65 +345,22 @@ namespace BiblCalCore
                         _s51 = _s5;
                         _mm1 = _mm;
                         _s11 = _s1;
-                        variablesSet = true; // Mark that variables were set
-                        _mc = _hw / 24;
-                        // Windows uses LG directly (which is already a fraction 0-1), not LG * 360
-                        // Matching Windows: JT = (JI + MC + DT + LG - 2415020.0278) / 36525
+                        _mc = _hw / 24.0;
                         if (_ji < 1483746)
                         {
-                            _jt = (_ji + _mc + _dt + _calculator.LG - 2415020.0278) / 36525;
+                            _jt = (_ji + _mc + _dt + _calculator.LG - 2415020.0278) / 36525.0;
                         }
                         else
                         {
-                            _jt = (_ji + _mc + _dt + _calculator.LG - 2415020) / 36525;
+                            _jt = (_ji + _mc + _dt + _calculator.LG - 2415020) / 36525.0;
                         }
                     }
-                    loopCounter++;
-                    if (loopCounter >= maxIterations)
-                    {
-                        moonsetFound = true;
-                        _ho = Math.Floor(_hv);
-                        _hq = Math.Floor((_hv - _ho) * 60);
-                        _hoString = ((int)_ho).ToString();
-                        _hqString = ((int)_hq).ToString();
-                        if (_hqString.Length > 1)
-                        {
-                            _hqString = _hqString.Substring(Math.Max(_hqString.Length - 2, 0));
-                        }
-                        break;
-                    }
-                } while (!moonsetFound);
-
-                // Ensure all variables are set (in case moonset was found on first iteration)
-                // Use current values from last FindPositionOfMoon call
-                // Note: In Windows code, these are set from the iteration BEFORE moonset was found
-                // But if moonset is found on first iteration, we use current values
-                if (!variablesSet)
-                {
-                    // Moonset was found on first iteration, use current values
-                    _l1 = _l;
-                    _lo1 = _lo;
-                    _lb1 = _lb;
-                    _lt1 = _calculator.LT;
-                    _d81 = _d8;
-                    _b31 = _b3;
-                    _s51 = _s5;
-                    _mm1 = _mm;
-                    _s11 = _s1;
                 }
+                while (!moonsetFound);
 
-                // Format hour string correctly - ensure it's 1-2 digits
-                // Recalculate from _ho to ensure correct formatting
-                int hourInt = (int)_ho;
-                if (hourInt > 23)
+                if (_ho > 9)
                 {
-                    hourInt = hourInt % 24;
-                }
-                _hoString = hourInt.ToString();
-                // Pad single digit hours with space for alignment
-                if (hourInt < 10)
-                {
-                    _hoString = " " + _hoString;
+                    _hoString = _hoString.Substring(Math.Max(_hoString.Length - 2, 0));
                 }
                 if (_hq < 10)
                 {
@@ -458,23 +370,15 @@ namespace BiblCalCore
                 {
                     _outputWriter.Write("  " + _hoString + ":" + _hqString);
                 }
-
-                // Calculate time lag
                 _tl = (_ho * 60 + _hq) - (_ht * 60 + _hm);
-
-                // Calculate illumination
                 _di = Math.Cos(_l1 - _lo1) * Math.Cos(_lb1);
-                _di = -Math.Atan(_di / Math.Sqrt((-_di) * _di + 1)) + PI / 2;
+                _di = -Math.Atan(_di / Math.Sqrt((-_di) * _di + 1)) + PI / 2.0;
                 _im = PI - _di - (0.1468 * ((1 - 0.0549 * Math.Sin(_mm1)) / (1 - 0.0167 * Math.Sin(_s11))) * DR) * Math.Sin(_di);
-                _il = (float)((1 + Math.Cos(_im)) / 2);
-                _il = (float)((int)(_il * 10000) / 100.0);
+                _il = (float)((1 + Math.Cos(_im)) / 2.0);
+                _il = (float)(Convert.ToInt32(_il * 10000) / 100.0);
                 _ilString = FormatToString(_il, 4);
                 _outputWriter.Write("    " + _ilString);
-
-                // Print sun's azimuth
                 _outputWriter.Write("  " + _azsString);
-
-                // Calculate moon's azimuth and altitude (matching Windows exactly)
                 _had = (_s51 + (_hl + 12) * 1.002737908 - _aj - _b31);
                 _ha = _had / 3.8197186342055;
                 _aza = Math.Sin(_ha);
@@ -483,9 +387,8 @@ namespace BiblCalCore
                 _azc = _az / DR;
                 _halp = Math.Sin(_lt1) * Math.Sin(_d81) + Math.Cos(_lt1) * Math.Cos(_d81) * Math.Cos(_ha);
                 _hal = (Math.Atan(_halp / Math.Sqrt((-_halp) * _halp + 1))) / DR;
-                _hal = Math.Floor(_hal * 10000) / 10000;
+                _hal = Math.Floor(_hal * 10000) / 10000.0;
                 _halString = FormatToString(_hal, 4);
-
                 if (_aza > 0 && _azb < 0)
                 {
                     _az += PI;
@@ -500,49 +403,19 @@ namespace BiblCalCore
                 }
                 _az /= DR;
                 _azString = FormatToString(_az, 5);
-
-                // Print moon's azimuth and altitude
                 _outputWriter.Write("  " + _azString);
                 _outputWriter.Write("   " + _halString);
-
-                // Recalculate _jt for moonset time (_hv) before NauticalTwilightCalc
-                // This ensures solar positions are calculated for the actual moonset time, not _hw
-                // The difference is _aj / 24 / 36525, which is small but affects precision
-                if (_ji < 1483746)
-                {
-                    _jt = (_ji + _hv / 24 + _dt + _calculator.LG - 2415020.0278) / 36525;
-                }
-                else
-                {
-                    _jt = (_ji + _hv / 24 + _dt + _calculator.LG - 2415020) / 36525;
-                }
-
-                // Calculate nautical twilight
                 NauticalTwilightCalc();
-
-                // Calculate visibility number
-                // Round intermediate calculations to match VB.NET precision
-                double tempTl = RoundToPrecision(_tl, 10);
-                double tempIl = RoundToPrecision(_il, 10);
-                double tempHal = RoundToPrecision(_hal, 10);
-                double tempSam = RoundToPrecision(_sam, 10);
-                _visibilityNumber = (tempTl + tempIl * 27 + tempHal * 5.5 - tempSam * 5) / 1.7;
-                // Round final result to match VB.NET precision
-                _visibilityNumber = RoundToPrecision(_visibilityNumber, 10);
+                _visibilityNumber = (_tl + _il * 27 + _hal * 5.5 - _sam * 5) / 1.7;
+                
                 _visibilityNumberString = FormatToString(_visibilityNumber, 5);
                 _outputWriter.Write("    " + _visibilityNumberString);
-
-                // Determine visibility status - for local calculations, recursively call FiftyTwoFifty to process next day
                 if (_visibilityNumber <= 88)
                 {
                     _ji++;
                     _mc = 0;
                     _outputWriter.WriteLine("  Not Visible");
-                    // Matching Windows: recursively call FiftyTwoFifty to find next day
-                    // Set flag to allow processing first day of next month if needed
-                    _processingNotVisible = true;
                     FiftyTwoFifty();
-                    _processingNotVisible = false;
                     return;
                 }
                 if (_visibilityNumber > 88 && _visibilityNumber <= 100)
@@ -557,24 +430,27 @@ namespace BiblCalCore
                     _outputWriter.WriteLine("  Prob Not Visible");
                     return;
                 }
-                if (_visibilityNumber > 100 && _visibilityNumber <= 112)
-                {
-                    _vs = 2;
-                    _aa = _ji + 1;
-                    _mc = 0;
-                    if (_dateOfFirstMonth == 0)
-                    {
-                        _dateOfFirstMonth = _aa;
-                    }
-                    _outputWriter.WriteLine("  Prob Visible");
-                    return;
-                }
                 else
                 {
-                    _vs = 3;
-                    _aa = _ji + 1;
-                    _mc = 0;
-                    _outputWriter.WriteLine("  Visible");
+                    if (_visibilityNumber > 100 && _visibilityNumber <= 112)
+                    {
+                        _vs = 2;
+                        _aa = _ji + 1;
+                        _mc = 0;
+                        if (_dateOfFirstMonth == 0)
+                        {
+                            _dateOfFirstMonth = _aa;
+                        }
+                        _outputWriter.WriteLine("  Prob Visible");
+                        return;
+                    }
+                    else
+                    {
+                        _vs = 3;
+                        _aa = _ji + 1;
+                        _mc = 0;
+                        _outputWriter.WriteLine("  Visible");
+                    }
                 }
             }
             if (_dateOfFirstMonth == 0)
@@ -633,38 +509,16 @@ namespace BiblCalCore
             if (_dmt == 0)
             {
                 _ds = Math.Atan(_sd / Math.Sqrt((-_sd) * _sd + 1));
-                double cosLT = Math.Cos(_calculator.LT);
-                double cosDS = Math.Cos(_ds);
-                if (Math.Abs(cosLT * cosDS) > 0.0001)
-                {
-                    _h1 = (-0.01454 - Math.Sin(_calculator.LT) * Math.Sin(_ds)) / (cosLT * cosDS);
-                    _hs = ((-Math.Atan(_h1 / Math.Sqrt((-_h1) * _h1 + 1)) + 1.570796326795) * 3.8197186342055) - _et;
-                }
-                else
-                {
-                    _hs = 12.0;
-                }
+                _h1 = (-0.01454 - Math.Sin(_calculator.LT) * Math.Sin(_ds)) / (Math.Cos(_calculator.LT) * Math.Cos(_ds));
+                _hs = ((-Math.Atan(_h1 / Math.Sqrt((-_h1) * _h1 + 1)) + 1.570796326795) * 3.8197186342055) - _et;
                 _hl = _hs + _aj + _sj + 0.00833333333;
                 _hm = Math.Floor((_hl - Math.Floor(_hl)) * 60);
                 _ht = Math.Floor(_hl);
-                // Format hour string correctly - ensure it's 1-2 digits
-                int hourIntSunset = (int)_ht;
-                if (hourIntSunset > 23)
-                {
-                    hourIntSunset = hourIntSunset % 24;
-                }
-                _htString = hourIntSunset.ToString();
-                _hmString = ((int)_hm).ToString();
-                if (_hmString.Length > 1)
-                {
-                    _hmString = _hmString.Substring(Math.Max(_hmString.Length - 2, 0));
-                }
-                // Windows: TPrint("   ") only if !SunsetFlag (for local calculations, SunsetFlag is false)
-                // But check if date column already has trailing space - if so, reduce spacing to avoid double spacing
-                // Windows prints "   " (3 spaces) before sunset, but date might already have trailing space
-                // Actually, Windows date output doesn't have trailing space, so we need "   " (3 spaces)
+                _htString = _ht >= 0 ? " " + _ht.ToString() : _ht.ToString();
+                _hmString = _hm >= 0 ? " " + _hm.ToString() : _hm.ToString();
+                _hmString = _hmString.Substring(1);
                 _outputWriter.Write("   ");
-                if (hourIntSunset < 10)
+                if (_ht < 10)
                 {
                     _htString = " " + _htString;
                 }
@@ -676,8 +530,6 @@ namespace BiblCalCore
                 {
                     _outputWriter.Write(_htString + ":" + _hmString);
                 }
-                // Add spacing after sunset time to align with "Moonset" column header
-                _outputWriter.Write("   ");
             }
         }
 
@@ -831,16 +683,6 @@ namespace BiblCalCore
             }
             _hq = Math.Floor((_hv - Math.Floor(_hv)) * 60);
             _ho = Math.Floor(_hv);
-
-            // Check if moonset found
-            if (_hw < 0 || _hw > 24)
-            {
-                _mc = 0;
-            }
-            else
-            {
-                _mc = 1;
-            }
         }
 
         private void NauticalTwilightCalc()
@@ -887,20 +729,13 @@ namespace BiblCalCore
                 _ras += 2 * PI;
             }
             _ras *= 3.8197186342055;
-            // Round intermediate calculations to match VB.NET precision
-            _ras = RoundToPrecision(_ras, 10);
+            // Windows: HAS = (S5 + (HV + 12) * 1.002737908d - AJ - RAS);
             _has = (_s5 + (_hv + 12) * 1.002737908 - _aj - _ras);
             _has /= 3.8197186342055;
-            // Round before trigonometric calculations
-            _has = RoundToPrecision(_has, 12);
             _ssam = Math.Sin(_calculator.LT) * Math.Sin(_ds) + Math.Cos(_calculator.LT) * Math.Cos(_ds) * Math.Cos(_has);
-            // Round intermediate calculation to match VB.NET precision
-            _ssam = RoundToPrecision(_ssam, 12);
             _sam = (Math.Atan(_ssam / Math.Sqrt((-_ssam) * _ssam + 1))) / DR;
-            // Round before adding adjustment to match VB.NET precision
-            _sam = RoundToPrecision(_sam, 10);
             _sam += 1.75;
-            _sam = Math.Floor(_sam * 10000) / 10000;
+            _sam = Math.Floor(_sam * 10000) / 10000.0;
             _samString = FormatToString(_sam, 4);
             _outputWriter.Write("      " + _samString);
         }
@@ -1015,17 +850,30 @@ namespace BiblCalCore
         {
             // Matching Windows PrintLocation (lines 1282-1298) - simplified for our use
             int latDeg = (int)Math.Floor(Math.Abs(latitude));
-            int latMin = (int)Math.Floor((Math.Abs(latitude) - latDeg) * 60);
+            double latMinDecimal = (Math.Abs(latitude) - latDeg) * 60;
+            int latMin = (int)Math.Round(latMinDecimal, MidpointRounding.AwayFromZero);
             string latDir = latitude >= 0 ? "N" : "S";
 
             int longDeg = (int)Math.Floor(Math.Abs(longitude));
-            int longMin = (int)Math.Floor((Math.Abs(longitude) - longDeg) * 60);
+            double longMinDecimal = (Math.Abs(longitude) - longDeg) * 60;
+            int longMin = (int)Math.Round(longMinDecimal, MidpointRounding.AwayFromZero);
             string longDir = longitude < 0 ? "E" : "W";
 
-            double gmtOffset = hr - 12;
-            if (longDir == "W")
+            // Use stored original GMT offset if available, otherwise reverse-calculate from hr
+            double gmtOffset;
+            if (!double.IsNaN(_originalGmtOffset))
             {
-                gmtOffset = 12 - hr;
+                // Use the original GMT offset that was passed in
+                gmtOffset = _originalGmtOffset;
+            }
+            else
+            {
+                // Fallback: reverse-calculate from hr (may not work correctly for negative offsets)
+                gmtOffset = hr - 12;
+                if (longDir == "W")
+                {
+                    gmtOffset = 12 - hr;
+                }
             }
 
             string gmtStr = gmtOffset >= 0 ? $"+{gmtOffset}" : gmtOffset.ToString(CultureInfo.InvariantCulture);

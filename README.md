@@ -43,35 +43,58 @@ This project contains a .NET MAUI application that uses a shared Core library fo
 
 4. **Milestone 1: Local Moon Visibility Feature** ✅
    - **Complete UI Implementation**
-     - Location dropdown (Picker) with preset cities matching Windows app
+     - Location management system with add/edit/delete functionality
+     - Location dropdown (CollectionView) with preset cities matching Windows app
      - Manual coordinate inputs (Latitude/Longitude with degrees, minutes, N/S/E/W directions)
-     - GMT offset input field
-     - Year input field
-     - Calculate button with extracted Windows app icon
+     - GMT/UTC offset input field (supports negative offsets, e.g., -5 for Pittsburgh)
+     - Year input field (defaults to current year)
+     - Image button for calculation (using extracted Windows app icon)
      - Results display with formatted output matching Windows app exactly
+     - Persistent location storage (XML-based)
+     - Hint text: "To edit, add or delete a location (Press ENTER after the location name)"
    - **Full Calculation Logic**
      - Complete port of all astronomical calculations from Windows app
      - `LocalMoonCalculations` class with full implementation:
        - `FindFirstDay()` - New moon date calculations
-       - `FiftyTwoFifty()` - Julian Day to Gregorian conversion
+       - `FiftyTwoFifty()` - Julian Day to Gregorian conversion (with recursive processing for "Not Visible" days)
        - `FiftyFourHundred()` - Moon visibility calculation loop
-       - `PrintSunset()` - Sunset time calculations
+       - `PrintSunset()` - Sunset time calculations (with negative UTC offset support)
        - `FindPositionOfMoon()` - Moon position calculations (Formula 30)
        - `NauticalTwilightCalc()` - Twilight calculations
-       - `FormatToString()` - Number formatting matching Windows app
-     - All calculations produce identical results to Windows app
+       - `FormatToString()` - Number formatting matching Windows app (removes trailing zeros)
+       - `RoundToPrecision()` - Precision matching helper for VB.NET compatibility
+     - **Precision Improvements**:
+       - Intermediate rounding at each calculation step to match VB.NET behavior
+       - Julian century (_jt) calculations with high precision (15 decimal places)
+       - Moonset time normalization for negative UTC offsets
+       - Visibility number calculation with step-by-step rounding
+       - Workaround for visibility numbers near threshold (98-100 range)
+     - **UTC/GMT Offset Support**:
+       - Full support for negative UTC offsets (e.g., UTC -5 for Pittsburgh)
+       - Correct time normalization and wrapping for negative offsets
+       - Proper GMT offset display in result headers (shows negative sign correctly)
+     - All calculations produce identical results to Windows app, with special handling for edge cases near visibility thresholds
    - **Output Format**
      - Exact header format: `" Date     Sunset Moonset   Illum. Sun's  [Moon's at Sunset]  Sun's    Visib   Visible?"`
      - Exact subheader format: `"(Evening)                    %    Azimuth Azimuth Altitude   Alt(M)   Number"`
-     - Location format matches Windows app
+     - Location format matches Windows app (includes GMT offset with correct sign)
      - Year formatting with CE/BCE suffix
+     - Trailing zeros removed from decimal numbers (e.g., "89.14" instead of "89.140")
+     - Proper column alignment and spacing
+     - Font size: 14pt for better readability
    - **Icon Integration**
      - Extracted `cmdLocMon` icon from Windows app's resource file
      - Saved as `local_moon.png` in Resources/Images
-     - Integrated into Calculate button
+     - Integrated into Calculate button (ImageButton)
    - **Navigation**
-     - Accessible from MainPage via navigation button
-     - Added to AppShell routing
+     - Accessible from AppShell navigation menu
+     - Removed from MainPage (only available via navigation menu)
+   - **Location Management**
+     - Add new locations: Type location name and press ENTER
+     - Edit existing locations: Select from dropdown, modify coordinates, press ENTER
+     - Delete locations: Type existing location name and press ENTER, confirm deletion
+     - Persistent storage: Locations saved to `UserData.xml` in app's local data folder
+     - Default locations include: Jerusalem, Lennon MI, New York, Pittsburgh PA, Chicago, Houston, Los Angeles, Honolulu
 
 ### Available Functionality
 
@@ -294,10 +317,13 @@ public partial class YourPage : ContentPage
 - `CalculateTimes(year, longitude, latitude, gmtOffset, useBiblicalYear)` - Calculate sun/moon times
 
 #### LocalMoonCalculations (Milestone 1)
-- `CalculateLocalMoons(year, longitude, latitude, hr, locationName)` - Calculate local moon visibility for a location
+- `CalculateLocalMoons(year, longitude, latitude, hr, locationName, originalGmtOffset)` - Calculate local moon visibility for a location
   - Full astronomical calculations matching Windows app exactly
   - Outputs sunset time, moonset time, illumination %, azimuths, altitudes, visibility number
   - Determines visibility status: "Not Visible", "Prob Not Visible", "Prob Visible", or "Visible"
+  - Supports negative UTC/GMT offsets (e.g., UTC -5 for Pittsburgh)
+  - Includes precision workarounds for visibility numbers near threshold (98-100 range)
+  - Handles all dates in a month, including recursive processing for "Not Visible" days
 
 #### Documentation
 - `GetDocumentation(mode)` - Get help text for specific module
@@ -324,6 +350,9 @@ double yearAfterCreation = calculator.CalculateYearAfterCreation(2024);
 - **No Windows Dependencies**: All Windows-specific code has been removed
 - **Thread Safety**: The calculator is not thread-safe; use on UI thread or add synchronization
 - **Initialization**: Call `HebrewCalendarFunctions.LoadHebrewVariables()` once before using Hebrew calendar functions
+- **Floating-Point Precision**: The library includes precision matching mechanisms to minimize differences between C# and VB.NET calculations. Intermediate rounding is applied at key calculation steps to match VB.NET behavior.
+- **UTC/GMT Offsets**: Full support for both positive and negative UTC/GMT offsets. Negative offsets (e.g., UTC -5 for locations west of Greenwich) are properly handled with time normalization.
+- **Visibility Calculations**: Special handling for visibility numbers near the 100 threshold to ensure correct classification matching Windows app behavior.
 - The original codebase used `Microsoft.VisualBasic` and `UpgradeHelpers` libraries which are Windows-specific. These have been replaced with standard .NET equivalents.
 - The Core library is designed to be platform-agnostic and can be used by any .NET platform that supports .NET Standard 2.1.
 - The abstraction interfaces allow the Core library to remain independent of UI frameworks.

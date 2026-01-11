@@ -185,7 +185,7 @@
                             <Label x:Name="ResultsLabel"
                                    Text="Results will appear here..."
                                    TextColor="Black"
-                                   FontSize="14"
+                                   FontSize="16"
                                    FontFamily="Courier"
                                    LineBreakMode="WordWrap"
                                    VerticalOptions="Start"

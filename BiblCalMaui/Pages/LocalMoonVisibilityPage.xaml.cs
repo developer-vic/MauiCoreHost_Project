@@ -403,7 +403,8 @@ namespace BiblCalMaui.Pages
         {
             int degrees = (int)Math.Floor(Math.Abs(decimalDegrees));
             double minutesDecimal = (Math.Abs(decimalDegrees) - degrees) * 60;
-            int minutes = (int)Math.Floor(minutesDecimal);
+            // Round to nearest minute for display accuracy
+            int minutes = (int)Math.Round(minutesDecimal, MidpointRounding.AwayFromZero);
             return (degrees, minutes);
         }
 
@@ -501,17 +502,19 @@ namespace BiblCalMaui.Pages
                 }
 
                 // Calculate hour location (HR) - matching Windows GetLocation exactly
-                // Windows GetLocation: HR = 12 + GMT, then if txtLonDir == "W": HR = 12 - GMT
-                // txtLonDir is from "Longitude" UI field (which shows longitude)
-                double hr = 12 + gmtOffset;
+                // Windows GetLocation logic:
+                //   HR = 12 + GMT (where GMT is always treated as positive value)
+                //   If txtLonDir == "W" (West): HR = 12 - GMT
+                //   If txtLonDir == "E" (East): HR = 12 + GMT (stays the same)
+                // The Windows app stores GMT as positive, direction determines if we add or subtract
+                // For negative GMT offsets (like -5), we need to use absolute value
+                double gmtValue = Math.Abs(gmtOffset);
+                double hr = 12 + gmtValue; // First step: add GMT
                 if (longDir == "W") // txtLonDir == "W" (West)
                 {
-                    hr = 12 - gmtOffset;
+                    hr = 12 - gmtValue; // For West: subtract GMT from 12
                 }
-                else // txtLonDir == "E" (East)
-                {
-                    hr = 12 + gmtOffset;
-                }
+                // For East: hr stays as 12 + gmtValue
 
                 // Calculate local moons using the calculation class (run on background thread)
                 string locationName = LocationEntry.Text?.Trim() ?? "Custom Location";
@@ -522,10 +525,11 @@ namespace BiblCalMaui.Pages
                     try
                     {
                         // Windows GetLocation produces: LG = longitude value, LT = latitude value
-                        // Function signature: CalculateLocalMoons(year, longitude, latitude, hr, locationName)
+                        // Function signature: CalculateLocalMoons(year, longitude, latitude, hr, locationName, originalGmtOffset)
                         // Function sets: LG = longitude parameter, LT = latitude parameter
                         // Pass coordinates in correct order: longitude, latitude
-                        _localMoonCalc.CalculateLocalMoons(year, longitude, latitude, hr, locationName);
+                        // Pass original GMT offset for correct display in header
+                        _localMoonCalc.CalculateLocalMoons(year, longitude, latitude, hr, locationName, gmtOffset);
                     }
                     catch (Exception calcEx)
                     {
